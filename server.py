@@ -30,7 +30,7 @@ default_help_str = """Sorry, I couldn't understand what you were trying to do. H
 
 def handle_sms(sender_number, body):
     # fetch user info from mongo using sender number
-    user_info = db.get_user(sender)
+    user_info = db.get_user(sender_number)
 
     # not in database
     if not user_info:
@@ -42,12 +42,15 @@ def handle_sms(sender_number, body):
 
         return "Hi there! Thanks for signing up for Paypaya. Please respond with your name to complete the setup."
 
+    print(f"fetched user info")
+    print(user_info)
+
     # check onboarding status
-    if user_info.onboarding_status == 0:
+    if user_info["onboarding_status"] == 0:
         # onboarding flow step 1
         # fill in name
         db.update_user({"phone": sender_number}, {"name": body})
-        return f"Thanks, ${body}! You're good to go!"
+        return f"Thanks, {body}! You're good to go!"
 
     # unknown status/command, return default_help_str
     return default_help_str

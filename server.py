@@ -1,14 +1,17 @@
 from flask import Flask, request, redirect
 from twilio.twiml.messaging_response import MessagingResponse
+import os
 
 app = Flask(__name__)
-
 
 @app.route("/sms", methods=['GET', 'POST'])
 def incoming_sms():
     """Send a dynamic reply to an incoming text message"""
     # Get the message the user sent our Twilio number
     body = request.values.get('Body', None)
+    sender = request.values.get('From')
+
+    print(f"message received from {sender}! received body: {body}")
 
     # Start our TwiML response
     resp = MessagingResponse()

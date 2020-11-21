@@ -1,3 +1,5 @@
 # python-dotenv
 twilio
 flask
+pymongo
+dnspython

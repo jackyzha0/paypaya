@@ -1,5 +1,5 @@
-# from dotenv import load_dotenv
-# import os
+from dotenv import load_dotenv
+import os
 import requests
 from db import *
 import uuid
@@ -7,8 +7,11 @@ import uuid
 class PayPalClient:
     root_url = "https://api-m.sandbox.paypal.com"
 
-    def __init__(self, phone):
-        self.authstr = db.lookup_paypalauth(phone)
+    def __init__(self, phone, authStr=None):
+        if authStr:
+            self.authstr = authStr
+        else:
+            self.authstr = db.lookup_paypalauth(phone)
         self.token = "no token"
         self.setupToken()
         self.phone = phone
@@ -62,17 +65,23 @@ class PayPalClient:
 
     def pay(self, recipient_phone, amt):
         print(f"processing payment from {self.phone} to {recipient_phone} for ${amt}")
+        user = db.get_user(recipient_phone) or {'paypal_email': 'None'}
         payload = self._formulatePayload(
             "payment_id",
             f"Payment from {self.phone}",
             f"Hey {recipient_phone}, {self.phone} sent you ${amt} with Paypaya!",
             amt,
-            db.get_user(recipient_phone)['paypal_email'],
+            user['paypal_email'],
             f"{self.phone} sent you ${amt} with Paypaya!",
         )
         r = self._constructPaypalAPICall(payload=payload)
         print(f"status: {r.status_code}")
         print(f"response: {r.json()}")
+        return r
+    
 
-# jacky = PayPalClient('+17789568798')
-# jacky.pay('+12368807768', 100)
+Bank = PayPalClient('BANK', os.getenv('PAYPAL_BANK'))
+
+if __name__ == "__main__":
+    jacky = PayPalClient('+17789568798')
+    # jacky.pay('+12368807768', 100)

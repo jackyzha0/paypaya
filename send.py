@@ -10,14 +10,12 @@ load_dotenv()
 # and set the environment variables. See http://twil.io/secure
 account_sid = os.getenv('TWILIO_ACCOUNT_SID')
 auth_token = os.getenv('TWILIO_AUTH_TOKEN')
-print(account_sid, auth_token)
 client = Client(account_sid, auth_token)
 
-message = client.messages \
-                .create(
-                    body="hi lovely",
-                    from_='+18337290967',
-                    to='+12368807768'
-                )
-
-print(message.sid)
+def SMS(to, message):
+    message = client.messages \
+        .create(
+            body=message,
+            from_='+18337290967',
+            to=to,
+        )

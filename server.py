@@ -2,6 +2,7 @@ from flask import Flask, request, redirect
 from twilio.twiml.messaging_response import MessagingResponse
 import os
 from db import *
+import send
 import paypal
 
 app = Flask(__name__)
@@ -23,10 +24,7 @@ def incoming_sms():
 
     return str(resp)
 
-default_help_str = """Sorry, I couldn't understand what you were trying to do. Here are some of the available commands:
-    send $<amount> <phone-number>
-    balance
-    ...
+default_help_str = """Sorry, I couldn't understand what you were trying to do. To send money, reply with a message in this format 'SEND <phone-number> <amount>' \n If you want to add money to your account, send a message in this format 'ADD ###-###-#### $10
 """
 
 def handle_sms(resp, sender_number, body):
@@ -63,7 +61,8 @@ def handle_sms(resp, sender_number, body):
         # onboarding flow step 1
         # fill in name
         db.update_user({"phone": sender_number}, {"name": body, "onboarding_status": 1})
-        resp.message(f"Thanks, {body}! You're good to go! Text 'help' for more info")
+        resp.message(f"Thanks, {body}! You're good to go.")
+        resp.message("To send money, reply with a message in this format 'SEND <phone-number> <amount>' \n If you want to add money to your account, send a message in this format 'ADD $10")
         return
 
     if user_info["onboarding_status"] == 1:
@@ -71,23 +70,53 @@ def handle_sms(resp, sender_number, body):
         if len(body.split(" ")) < 2:
             resp.message(default_help_str)
             return
-
-        resp.message("To send money, reply with a message in this format 'SEND ###-###-#### $10' \n If you want to add money to your account, send a message in this format 'ADD ###-###-#### $10")
         
         command = body.split(" ")[0]
-        recipient = body.split(" ")[1]
-        amt = int(body.split(" ")[2])
-
-        print(f"received command {command} targeted at {recipient} with amount {amt}")
-
         if (command == "SEND"):
+            recipient = body.split(" ")[1]
+            amt = int(body.split(" ")[2])
+
+            print(
+                f"received SEND targeted at {recipient} with amount {amt}"
+            )
+
             sender = paypal.PayPalClient(sender_number)
-            sender.pay(recipient, amt)
+            r = sender.pay(recipient, amt)
+            if r.status_code > 300:
+                resp.message(f"Uh oh! Something went wrong.")
+                resp.message(r.json())
+                return
+            resp.message(f"Successfully sent ${amt} to {recipient}!")
+            db.update_balance(sender_number, -1 * amt)
+            db.update_balance(recipient, amt)
+            resp.message(f"Your new balance is ${db.get_balance(sender_number)}")
+
+            recipient_name = db.get_user(recipient)['name']
+            send.SMS(
+                recipient, f"Hey {recipient_name}, you just received a new payment of ${amt} from {sender_number}.")
+            send.SMS(
+                recipient, f"Your new balance is ${db.get_balance(recipient)}")
+            return
+
         elif (command == "ADD"):
-            send(recipient, amt)   
+            amt = int(body.split(" ")[1])
+            sender = paypal.Bank
 
-        db.update_user({}, {"transaction_command": 0})
+            print(
+                f"received ADD targeted at {sender_number} with amount {amt}"
+            )
+
+            r = sender.pay(sender_number, amt)
+            if r.status_code > 300:
+                resp.message(f"Uh oh! Something went wrong.")
+                resp.message(r.json())
+                return
+            resp.message(f"Successfully deposited ${amt}!")
+            db.update_balance(sender_number, amt)
+            resp.message(f"Your new balance is ${db.get_balance(sender_number)}")
+            return
+
+        resp.message("To send money, reply with a message in this format 'SEND <phone-number> <amount>' \n If you want to add money to your account, send a message in this format 'ADD ###-###-#### $10")
     
-
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))

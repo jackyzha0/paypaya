@@ -13,6 +13,12 @@ class Db:
     def get_user(self, phone):
         return self.records.find_one({"phone": phone})
 
+    def update_balance(self, phone, amt):
+        self.records.update_one({"phone": phone}, {'$inc': {"balance": amt}})
+
+    def get_balance(self, phone):
+        return int(self.get_user(phone)['balance'])
+
     def update_user(self, filter, update_value):
         self.records.update_one(filter, {'$set': update_value})
 
@@ -29,12 +35,13 @@ class Db:
         
 
 class User:
-    def __init__(self, email, phone):
+    def __init__(self, email, phone, balance=5000):
         self.name = "placeholder_name"
         self.phone = phone
         self.paypal_email = email
         self.voice_identity = ""
         self.onboarding_status = 0
+        self.balance = balance
 
 db = Db('mongodb+srv://paypaya-main:test@cluster0.5hure.mongodb.net/paypaya_db?retryWrites=true&w=majority', 'paypaya_db')
 

@@ -1,59 +1,75 @@
-from dotenv import load_dotenv
-import os
+# from dotenv import load_dotenv
+# import os
 import requests
+from db import *
 
-# load .env file
-load_dotenv()
-authstr = os.getenv('PAYPAL_AUTH_STR')
+class PayPalClient:
+    root_url = "https://api-m.sandbox.paypal.com"
 
-url = "https://api-m.sandbox.paypal.com/v1/oauth2/token"
+    def __init__(self, phone):
+        self.authstr = db.lookup_paypalauth(phone)
+        self.token = "no token"
+        self.setupToken()
+        self.phone = phone
 
-payload = 'grant_type=client_credentials'
-headers = {
-    'Authorization': f'Basic {authstr}',
-    'Content-Type': 'application/x-www-form-urlencoded'
-}
+    def setupToken(self):
+        url = self.root_url + "/v1/oauth2/token"
+        payload = 'grant_type=client_credentials'
+        headers = {
+            'Authorization': f'Basic {self.authstr}',
+            'Content-Type': 'application/x-www-form-urlencoded'
+        }
 
-token = ""
-r = requests.request("POST", url, headers=headers, data=payload)
-print(r.status_code)
-if r.status_code != 200:
-    print("warn: did not get 200 from paypal auth")
+        r = requests.request("POST", url, headers=headers, data=payload)
+        if r.status_code != 200:
+            print("warn: did not get 200 from paypal auth")
 
-print(f"acquires scopes: {r.json()['scope']}")
-token = r.json()['access_token']
+        print(f"acquired scopes: {r.json()['scope']}")
+        self.token = r.json()['access_token']
 
-def constructPaypalAPICall(type="GET", payload=None):
-    url = "https://api-m.sandbox.paypal.com/v1/payments/payouts"
-    api_headers = {
-        'Authorization': f'Bearer {token}',
-        'Content-Type': 'application/json'
-    }
-    print(f"calling -> {url}")
-    return requests.request(type, url, headers=api_headers, json=payload)
+    def _constructPaypalAPICall(self, payload=None):
+        url = self.root_url + "/v1/payments/payouts"
+        api_headers = {
+            'Authorization': f'Bearer {self.token}',
+            'Content-Type': 'application/json'
+        }
 
+        print(f"calling -> {url}")
+        return requests.request("POST", url, headers=api_headers, json=payload)
 
-data = {
-    "sender_batch_header": {
-        "sender_batch_id": "Papaya Payout 0",
-        "email_subject": "You have a payout!",
-        "email_message": "You have received a payout! Thanks for using our service!"
-    },
-    "items": [
-        {
-            "recipient_type": "EMAIL",
-            "amount": {
-                "value": "420.69",
-                "currency": "USD"
+    def _formulatePayload(self, id, subject, message, amt, recipient_email, note):
+        return {
+            "sender_batch_header": {
+                "sender_batch_id": id,
+                "email_subject": subject,
+                "email_message": message,
             },
-            "note": "Thanks for your patronage!",
-            "sender_item_id": "201403140001",
-            "receiver": "0@paypaya.example.com",
-            "notification_language": "en-US"
-        },
-    ]
-}
+            "items": [
+                {
+                    "recipient_type": "EMAIL",
+                    "amount": {
+                        "value": amt,
+                        "currency": "USD"
+                    },
+                    "note": note,
+                    "sender_item_id": "201403140001",
+                    "receiver": recipient_email,
+                    "notification_language": "en-US"
+                },
+            ]
+        }
 
-r = constructPaypalAPICall(type="POST", payload = data)
-print(r.status_code)
-print(r.json())
+    def pay(self, recipient_phone, amt):
+        payload = self._formulatePayload(
+            "payment_id",
+            f"Payment from {self.phone}",
+            f"Hey {recipient_phone}, {self.phone} sent you ${amt} with Paypaya!",
+            amt,
+            db.get_user(recipient_phone)['paypal_email'],
+            f"{self.phone} sent you ${amt} with Paypaya!",
+        )
+        self._constructPaypalAPICall(payload=payload)
+
+
+jacky = PayPalClient('+17789568798')
+jacky.pay('+12368807768', 100)

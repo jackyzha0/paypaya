@@ -4,6 +4,7 @@ class Db:
         self.client = MongoClient(connection_url)
         self.db = self.client.get_database(database_name)
         self.records = self.db.user_records
+        self.emails = self.db.paypal_accounts
     
     def new_user(self, user):
         self.records.insert_one(user.__dict__)
@@ -15,15 +16,27 @@ class Db:
     def update_user(self, filter, update_value):
         self.records.update_one(filter, {'$set': update_value})
 
+    #find unused email
+    def find_unused_email(self):
+        return self.emails.find_one({"is_used": False})
+
+    def mark_email_as_used(self, email):
+        self.emails.update_one({"email": email}, {'$set': {"is_used" : True}})
+
+    def lookup_paypalauth(self, phone):
+        email = self.get_user(phone)['paypal_email']
+        return self.emails.find_one({"email": email})['paypal_auth']
+        
+
 class User:
-    def __init__(self, name, phone):
-        self.name = name
+    def __init__(self, email, phone):
+        self.name = "placeholder_name"
         self.phone = phone
-        self.paypal_email = ""
+        self.paypal_email = email
         self.voice_identity = ""
         self.onboarding_status = 0
 
-db = Db( 'mongodb+srv://paypaya-main:test@cluster0.5hure.mongodb.net/paypaya_db?retryWrites=true&w=majority', 'paypaya_db')
+db = Db('mongodb+srv://paypaya-main:test@cluster0.5hure.mongodb.net/paypaya_db?retryWrites=true&w=majority', 'paypaya_db')
 
 
 # new_user = User("name test", "phone test")

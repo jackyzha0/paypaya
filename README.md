@@ -1,3 +1,6 @@
+# Paypaya
+
+![Cover](/resources/cover.png)
 ## Inspiration
 
 More money, more problems. 

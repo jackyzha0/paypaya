@@ -7,7 +7,7 @@ import paypal
 
 app = Flask(__name__)
 
-VERIFY_THRESH = 50
+VERIFY_THRESH = 30
 
 azure_endpoint = "https://westus.api.cognitive.microsoft.com/sts/v1.0/issuetoken"
 
@@ -23,8 +23,7 @@ def statusCb(phn, num):
     if status == 'completed':
         # update onboarding status for user
         twilio.SMS(phn, "Thanks for verifying, Let's get started! \n\n To send money, reply with a message in this format 'SEND <recipient-phone-number> $00' \n \n To add money to your account, reply with a message in this format 'ADD $00' \n\n To withdraw funds to bank account, reply with a message in this format 'WITHDRAW $00' \n\n To view your balance, reply with 'BALANCE' \n\n")
-        db.update_user({"phone": phn}, {
-            "name": body, "onboarding_status": 2})
+        db.update_user({"phone": phn}, {"onboarding_status": 2})
     else:
         print(f"shits busted")
 
@@ -66,26 +65,28 @@ def transfer_cb(sender_number, recipient, amt):
     url = request.form.get('RecordingUrl')
     status = request.form.get('RecordingStatus')
 
-    verification_url = f'{azure_endpoint}/speaker/verification/v2.0/text-dependent/profiles/{phn}/verify'
+    verification_url = f'{azure_endpoint}/speaker/verification/v2.0/text-dependent/profiles/{sender_number}/verify'
 
     if status == 'completed':
         # update onboarding status for user
-        twilio.SMS(phn, "Thanks for verifying!")
+        twilio.SMS(sender_number, "Thanks for verifying!")
         transfer(sender_number, recipient, amt)
 
 
 def transfer(sender_number, recipient, amt):
     sender = paypal.PayPalClient(sender_number)
+    amt = int(amt)
     r = sender.pay(recipient, amt)
     if r.status_code > 300:
-        resp.message(f"Uh oh! Something went wrong.")
-        resp.message(r.json())
+        twilio.SMS(sender_number, "Uh oh! Something went wrong.")
+        twilio.SMS(sender_number, r.json())
         return
-    resp.message(f"Successfully sent ${amt} to {recipient}!")
+    twilio.SMS(sender_number, f"Successfully sent ${amt} to {recipient}!")
     db.update_balance(sender_number, -1 * amt)
     db.update_balance(recipient, amt)
-    resp.message(
-        f"Your new balance is ${db.get_balance(sender_number)}")
+
+    twilio.SMS(sender_number,
+               f"Your new balance is ${db.get_balance(sender_number)}")
 
     recipient_name = db.get_user(recipient)['name']
     twilio.SMS(
@@ -129,17 +130,18 @@ def handle_sms(resp, sender_number, body):
         # fill in name
         db.update_user({"phone": sender_number}, {
                        "name": body, "onboarding_status": 1})
-        resp.message(f"Thanks, {body}! Now let's add some security measures by adding your voice as a passcode. You will need to verify any payments over $30 via a phone call.")
+        resp.message(
+            f"Thanks, {body}! Now let's add some security measures by adding your voice as a passcode. You will need to verify any payments over ${VERIFY_THRESH} via a phone call.")
         resp.message(
             f"Now, we'll quickly call you and ask you to repeat a few phrases back to us.")
-        twilio_client.Call(sender_number)
+        twilio.Call(sender_number)
         return
 
     if user_info["onboarding_status"] == 1:
         # user never finished onboarding, redirect them back to this flow
         resp.message(
             f"Looks like you never finished verifying your voice! Let's fix that.")
-        twilio_client.Call(sender_number)
+        twilio.Call(sender_number)
         return
 
     if user_info["onboarding_status"] == 2:
@@ -201,6 +203,8 @@ def handle_sms(resp, sender_number, body):
             )
 
             if amt > VERIFY_THRESH:
+                resp.message(
+                    f"This transfer amount is greater than the threshold of ${VERIFY_THRESH}. To verify that this is you, please answer the call and repeat the phrase.")
                 twilio.Verify(sender_number, recipient, amt)
                 return
             transfer(sender_number, recipient, amt)

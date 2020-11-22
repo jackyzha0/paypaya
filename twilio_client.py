@@ -10,7 +10,7 @@ serv_url = "https://paypaya-webhook-dvkieiy6wa-uc.a.run.app"
 def get_twiml(phrase, to):
     return f"""<?xml version="1.0" encoding="UTF-8"?>
                 <Response>
-                <Say>To confirm your identity, please say the phrase "{phrase}". When finished, press star. We will ask for you to repeat this phrase 3 times.</Say>
+                <Say>To confirm your identity, please say the phrase "{phrase}" after the bleep. When finished, press star. </Say>
                 <Record
                 action="{serv_url}/recording_finished"
                 maxLength="10"

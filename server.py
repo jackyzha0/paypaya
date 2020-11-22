@@ -10,7 +10,7 @@ app = Flask(__name__)
 azure_endpoint = "https://westus.api.cognitive.microsoft.com/sts/v1.0/issuetoken"
 
 @app.route("/recording_cb/<phn>/<num>", methods=['POST'])
-def statusCb(recipient_phone, num):
+def statusCb(phn, num):
     sid = request.form.get('AccountSid')
     url = request.form.get('RecordingUrl')
     status = request.form.get('RecordingStatus')
@@ -23,8 +23,6 @@ def statusCb(recipient_phone, num):
         twilio.SMS(recipient_phone, "Thanks for verifying, Let's get started! \n\n To send money, reply with a message in this format 'SEND <recipient-phone-number> $00' \n \n To add money to your account, reply with a message in this format 'ADD $00' \n\n To withdraw funds to bank account, reply with a message in this format 'WITHDRAW $00' \n\n To view your balance, reply with 'BALANCE' \n\n")
         db.update_user({"phone": recipient_phone}, {
             "name": body, "onboarding_status": 2})
-        else:
-            twilio_client.SMS(recipient_phone, f"{num} down, {3-num} to go!")
     else:
         print(f"shits busted")
 

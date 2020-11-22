@@ -7,7 +7,7 @@ load_dotenv()
 
 serv_url = "https://paypaya-webhook-dvkieiy6wa-uc.a.run.app"
 
-def get_twiml(phrase, to):
+def get_reg_twiml(phrase, to):
     return f"""<?xml version="1.0" encoding="UTF-8"?>
                 <Response>
                 <Say>To confirm your identity, please say the phrase "{phrase}" after the bleep. When finished, press star. </Say>
@@ -50,7 +50,7 @@ def SMS(to, message):
 
 def Call(to):
     call = client.calls.create(
-        twiml=get_twiml('Papayas grow on trees', to),
+        twiml=get_reg_twiml('Papayas grow on trees', to),
         to=to,
         from_='+18337290967'
     )

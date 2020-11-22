@@ -34,6 +34,20 @@ def get_reg_twiml(phrase, to):
                 </Response>
             """
 
+def get_verify_twiml(sender, recipient, amt, phrase):
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+                <Response>
+                <Say>We recently noticed an attempt to transfer ${amt} to {recipient}. To confirm this transfer, say the phrase {phrase}. When finished, press star. </Say>
+                <Record
+                action="{serv_url}/recording_finished"
+                maxLength="10"
+                finishOnKey="*"
+                recordingStatusCallback="{serv_url}/transfer/{sender}/{recipient}/{amt}"
+                recordingStatusCallbackEvent="completed absent"/>
+                </Response>
+            """
+
+
 # Your Account Sid and Auth Token from twilio.com/console
 # and set the environment variables. See http://twil.io/secure
 account_sid = os.getenv('TWILIO_ACCOUNT_SID')
@@ -49,9 +63,17 @@ def SMS(to, message):
         )
 
 def Call(to):
-    call = client.calls.create(
+    client.calls.create(
         twiml=get_reg_twiml('Papayas grow on trees', to),
         to=to,
+        from_='+18337290967'
+    )
+
+def Verify(sender, recipient, amt):
+    client.calls.create(
+        twiml=get_verify_twiml(sender, recipient, amt,
+                               'Papayas grow on trees'),
+        to=sender,
         from_='+18337290967'
     )
 

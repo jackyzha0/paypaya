@@ -7,6 +7,8 @@ import paypal
 
 app = Flask(__name__)
 
+VERIFY_THRESH = 50
+
 azure_endpoint = "https://westus.api.cognitive.microsoft.com/sts/v1.0/issuetoken"
 
 @app.route("/recording_cb/<phn>/<num>", methods=['POST'])
@@ -30,7 +32,7 @@ def statusCb(phn, num):
 def finished():
     return  """<?xml version="1.0" encoding="UTF-8"?>
                 <Response>
-                <Say>Thank you for setting up voice authentication. Check your text messages for next steps.</Say>
+                <Say>Thank you for verifying. Check your text messages for next steps.</Say>
                 </Response>
             """
 
@@ -57,6 +59,39 @@ default_help_str = """Sorry, I couldn't understand what you were trying to do.
 
 info_str = "To send money, reply with a message in this format 'SEND <recipient-phone-number> $00' \n \n To add money to your account, reply with a message in this format 'ADD $00' \n\n To withdraw funds to bank account, reply with a message in this format 'WITHDRAW $00' \n\n To view your balance, reply with 'BALANCE' \n\n"
 
+
+@app.route("/transfer/<sender_number>/<recipient>/<amt>", methods=['POST'])
+def transfer_cb(sender_number, recipient, amt):
+    sid = request.form.get('AccountSid')
+    url = request.form.get('RecordingUrl')
+    status = request.form.get('RecordingStatus')
+
+    verification_url = f'{azure_endpoint}/speaker/verification/v2.0/text-dependent/profiles/{phn}/verify'
+
+    if status == 'completed':
+        # update onboarding status for user
+        twilio.SMS(phn, "Thanks for verifying!")
+        transfer(sender_number, recipient, amt)
+
+
+def transfer(sender_number, recipient, amt):
+    sender = paypal.PayPalClient(sender_number)
+    r = sender.pay(recipient, amt)
+    if r.status_code > 300:
+        resp.message(f"Uh oh! Something went wrong.")
+        resp.message(r.json())
+        return
+    resp.message(f"Successfully sent ${amt} to {recipient}!")
+    db.update_balance(sender_number, -1 * amt)
+    db.update_balance(recipient, amt)
+    resp.message(
+        f"Your new balance is ${db.get_balance(sender_number)}")
+
+    recipient_name = db.get_user(recipient)['name']
+    twilio.SMS(
+        recipient, f"Hey {recipient_name}, you just received a new payment of ${amt} from {sender_number}.")
+    twilio.SMS(
+        recipient, f"Your new balance is ${db.get_balance(recipient)}")
 
 def handle_sms(resp, sender_number, body):
 
@@ -165,23 +200,10 @@ def handle_sms(resp, sender_number, body):
                 f"received SEND targeted at {recipient} with amount {amt}"
             )
 
-            sender = paypal.PayPalClient(sender_number)
-            r = sender.pay(recipient, amt)
-            if r.status_code > 300:
-                resp.message(f"Uh oh! Something went wrong.")
-                resp.message(r.json())
+            if amt > VERIFY_THRESH:
+                twilio.Verify(sender_number, recipient, amt)
                 return
-            resp.message(f"Successfully sent ${amt} to {recipient}!")
-            db.update_balance(sender_number, -1 * amt)
-            db.update_balance(recipient, amt)
-            resp.message(
-                f"Your new balance is ${db.get_balance(sender_number)}")
-
-            recipient_name = db.get_user(recipient)['name']
-            twilio.SMS(
-                recipient, f"Hey {recipient_name}, you just received a new payment of ${amt} from {sender_number}.")
-            twilio.SMS(
-                recipient, f"Your new balance is ${db.get_balance(recipient)}")
+            transfer(sender_number, recipient, amt)
             return
 
         resp.message(info_str)

@@ -15,13 +15,13 @@ def statusCb(phn, num):
     url = request.form.get('RecordingUrl')
     status = request.form.get('RecordingStatus')
 
-    verification_url = f'{azure_endpoint}/speaker/verification/v2.0/text-dependent/profiles/{recipient_phone}/enrollments'
+    verification_url = f'{azure_endpoint}/speaker/verification/v2.0/text-dependent/profiles/{phn}/enrollments'
 
-    print(f"got n={num} recording callback from {recipient_phone}. status={status}")
+    print(f"got n={num} recording callback from {phn}. status={status}")
     if status == 'completed':
         # update onboarding status for user
-        twilio.SMS(recipient_phone, "Thanks for verifying, Let's get started! \n\n To send money, reply with a message in this format 'SEND <recipient-phone-number> $00' \n \n To add money to your account, reply with a message in this format 'ADD $00' \n\n To withdraw funds to bank account, reply with a message in this format 'WITHDRAW $00' \n\n To view your balance, reply with 'BALANCE' \n\n")
-        db.update_user({"phone": recipient_phone}, {
+        twilio.SMS(phn, "Thanks for verifying, Let's get started! \n\n To send money, reply with a message in this format 'SEND <recipient-phone-number> $00' \n \n To add money to your account, reply with a message in this format 'ADD $00' \n\n To withdraw funds to bank account, reply with a message in this format 'WITHDRAW $00' \n\n To view your balance, reply with 'BALANCE' \n\n")
+        db.update_user({"phone": phn}, {
             "name": body, "onboarding_status": 2})
     else:
         print(f"shits busted")

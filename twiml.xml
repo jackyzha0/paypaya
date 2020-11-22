@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+ <Say>To confirm your identity, please say "my voice is my passport verify me". When finished, press *.</Say>
+ <Record
+   action="https://myapp.com/recording-confirm.php"
+   maxLength="10"
+   finishOnKey="*"
+   recordingStatusCallback="https://myapp.com/recording-events"
+   recordingStatusCallbackEvent="in-progress completed absent"/>
+ <Say>Thank you for verifying. Please repeat it one more time and press *.</Say>
+</Response>

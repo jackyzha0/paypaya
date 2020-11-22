@@ -35,7 +35,7 @@ class Db:
         
 
 class User:
-    def __init__(self, email, phone, balance=5000):
+    def __init__(self, email, phone, balance=0):
         self.name = "placeholder_name"
         self.phone = phone
         self.paypal_email = email

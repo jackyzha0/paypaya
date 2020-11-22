@@ -2,6 +2,7 @@ from flask import Flask, request, redirect
 from twilio.twiml.messaging_response import MessagingResponse
 import os
 from db import *
+import paypal
 
 app = Flask(__name__)
 
@@ -62,26 +63,31 @@ def handle_sms(resp, sender_number, body):
         # onboarding flow step 1
         # fill in name
         db.update_user({"phone": sender_number}, {"name": body, "onboarding_status": 1})
-        resp.message(f"Thanks, {body}! You're good to go!")
+        resp.message(f"Thanks, {body}! You're good to go! Text 'help' for more info")
         return
-    
-    if user_info["onboarding_status"] == 1:
-        resp.message(f"Hi {name}! Would you like to send or add money?")
-        resp.message("Message 1 to send money, message 2 to add money to your account")
-        db.update_user({"transaction_command": 0}, {"transaction_command": body})
 
-        if user_info["transaction_command"] == 1:
-            resp.message("Enter the phone number of your recipient, followed by the $ amount you want to send")
-            resp.message("Example: ###-###-#### $00")
-            recipient = body.split(" $")[0]
-            amt = body.split("$ ")[1]
-            pay(sender, recipient, amt):
-            return None
+    if user_info["onboarding_status"] == 1:
+
+        if len(body.split(" ")) < 2:
+            resp.message(default_help_str)
+            return
+
+        resp.message("To send money, reply with a message in this format 'SEND ###-###-#### $10' \n If you want to add money to your account, send a message in this format 'ADD ###-###-#### $10")
+        
+        command = body.split(" ")[0]
+        recipient = body.split(" ")[1]
+        amt = int(body.split(" ")[2])
+
+        print(f"received command {command} targeted at {recipient} with amount {amt}")
+
+        if (command == "SEND"):
+            sender = paypal.PayPalClient(sender_number)
+            sender.pay(recipient, amt)
+        elif (command == "ADD"):
+            send(recipient, amt)   
 
         db.update_user({}, {"transaction_command": 0})
-        
-    # unknown status/command, return default_help_str
-    resp.message(default_help_str)
+    
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))

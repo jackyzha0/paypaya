@@ -2,6 +2,7 @@
 # import os
 import requests
 from db import *
+import uuid
 
 class PayPalClient:
     root_url = "https://api-m.sandbox.paypal.com"
@@ -40,7 +41,7 @@ class PayPalClient:
     def _formulatePayload(self, id, subject, message, amt, recipient_email, note):
         return {
             "sender_batch_header": {
-                "sender_batch_id": id,
+                "sender_batch_id": str(uuid.uuid4()),
                 "email_subject": subject,
                 "email_message": message,
             },
@@ -60,6 +61,7 @@ class PayPalClient:
         }
 
     def pay(self, recipient_phone, amt):
+        print(f"processing payment from {self.phone} to {recipient_phone} for ${amt}")
         payload = self._formulatePayload(
             "payment_id",
             f"Payment from {self.phone}",
@@ -68,8 +70,9 @@ class PayPalClient:
             db.get_user(recipient_phone)['paypal_email'],
             f"{self.phone} sent you ${amt} with Paypaya!",
         )
-        self._constructPaypalAPICall(payload=payload)
+        r = self._constructPaypalAPICall(payload=payload)
+        print(f"status: {r.status_code}")
+        print(f"response: {r.json()}")
 
-
-jacky = PayPalClient('+17789568798')
-jacky.pay('+12368807768', 100)
+# jacky = PayPalClient('+17789568798')
+# jacky.pay('+12368807768', 100)
